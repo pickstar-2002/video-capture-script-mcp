@@ -19,8 +19,15 @@ class VideoMCPServer {
   private server: Server;
   private videoProcessor: VideoProcessor;
   private frameExtractor: FrameExtractor;
+  private secretId?: string;
+  private secretKey?: string;
+  private region?: string;
 
-  constructor() {
+  constructor(options?: { secretId?: string; secretKey?: string; region?: string }) {
+    // 优先使用环境变量，其次使用传入的参数
+    this.secretId = process.env.TENCENT_SECRET_ID || options?.secretId;
+    this.secretKey = process.env.TENCENT_SECRET_KEY || options?.secretKey;
+    this.region = process.env.TENCENT_REGION || options?.region || 'ap-beijing';
     this.server = new Server(
       {
         name: 'video-mcp',
@@ -86,7 +93,7 @@ class VideoMCPServer {
                 prompt: {
                   type: 'string',
                   description: '分析提示词（可选）',
-                  default: '请详细描述这个视频中的内容，包括场景、人物、动作和其他重要信息。',
+                  default: '请基于这些视频关键帧，用100-200字简洁描述视频的主要内容、场景、人物和动作，不需要逐帧分析。',
                 },
                 maxFrames: {
                   type: 'number',
@@ -101,11 +108,11 @@ class VideoMCPServer {
                 },
                 secretId: {
                   type: 'string',
-                  description: '腾讯云 SecretId',
+                  description: '腾讯云 SecretId（可选，优先使用环境变量 TENCENT_SECRET_ID）',
                 },
                 secretKey: {
                   type: 'string',
-                  description: '腾讯云 SecretKey',
+                  description: '腾讯云 SecretKey（可选，优先使用环境变量 TENCENT_SECRET_KEY）',
                 },
                 region: {
                   type: 'string',
@@ -113,7 +120,7 @@ class VideoMCPServer {
                   default: 'ap-beijing',
                 },
               },
-              required: ['videoPath', 'secretId', 'secretKey'],
+              required: ['videoPath'],
             },
           },
           {
@@ -134,11 +141,11 @@ class VideoMCPServer {
                 },
                 secretId: {
                   type: 'string',
-                  description: '腾讯云 SecretId',
+                  description: '腾讯云 SecretId（可选，优先使用环境变量 TENCENT_SECRET_ID）',
                 },
                 secretKey: {
                   type: 'string',
-                  description: '腾讯云 SecretKey',
+                  description: '腾讯云 SecretKey（可选，优先使用环境变量 TENCENT_SECRET_KEY）',
                 },
                 region: {
                   type: 'string',
@@ -146,7 +153,7 @@ class VideoMCPServer {
                   default: 'ap-beijing',
                 },
               },
-              required: ['imagePaths', 'secretId', 'secretKey'],
+              required: ['imagePaths'],
             },
           },
           {
@@ -313,8 +320,16 @@ class VideoMCPServer {
         throw new Error('视频路径参数(videoPath)是必需的');
       }
 
-      if (!secretId || !secretKey) {
-        throw new Error('腾讯云认证信息缺失，请提供 secretId 和 secretKey 参数');
+      // 优先使用环境变量，其次使用参数中的密钥，最后使用构造函数中的密钥
+      const finalSecretId = process.env.TENCENT_SECRET_ID || secretId || this.secretId;
+      const finalSecretKey = process.env.TENCENT_SECRET_KEY || secretKey || this.secretKey;
+      const finalRegion = process.env.TENCENT_REGION || region || this.region;
+
+      if (!finalSecretId || !finalSecretKey) {
+        throw new Error(`腾讯云认证信息缺失。请通过以下方式之一提供：
+1. 环境变量：TENCENT_SECRET_ID 和 TENCENT_SECRET_KEY
+2. 启动参数：--secret-id 和 --secret-key
+3. 调用参数：secretId 和 secretKey`);
       }
 
       // 检查文件是否存在
@@ -326,18 +341,18 @@ class VideoMCPServer {
       }
 
       console.error(`开始分析视频内容: ${videoPath}`);
-      console.error(`分析参数 - 最大帧数: ${maxFrames}, 策略: ${strategy}, 地域: ${region || 'ap-beijing'}`);
+      console.error(`分析参数 - 最大帧数: ${maxFrames}, 策略: ${strategy}, 地域: ${finalRegion}`);
 
       const result = await this.videoProcessor.analyzeVideo(videoPath, {
         prompt,
         maxFrames,
         strategy,
-        secretId,
-        secretKey,
-        region,
+        secretId: finalSecretId,
+        secretKey: finalSecretKey,
+        region: finalRegion,
       });
 
-      console.error(`视频分析完成 - 分析了 ${result.frameAnalyses.length} 个帧，总计使用 ${result.totalUsage.totalTokens} 个token`);
+      console.error(`视频分析完成`);
 
       return {
         content: [
@@ -347,20 +362,8 @@ class VideoMCPServer {
           },
           {
             type: 'text',
-            text: `📋 分析总结:\n${result.summary}`,
+            text: `📋 视频内容总结:\n${result.summary}`,
           },
-          {
-            type: 'text',
-            text: `📊 统计信息:\n- 分析帧数: ${result.frameAnalyses.length}\n- Token使用: ${result.totalUsage.totalTokens} (提示: ${result.totalUsage.promptTokens}, 回复: ${result.totalUsage.completionTokens})`,
-          },
-          {
-            type: 'text',
-            text: `🎬 详细帧分析:`,
-          },
-          ...result.frameAnalyses.map((analysis: any, index: number) => ({
-            type: 'text' as const,
-            text: `\n📸 第 ${index + 1} 帧:\n${analysis.content}`,
-          })),
         ],
       };
     } catch (error) {
@@ -378,8 +381,16 @@ class VideoMCPServer {
         throw new Error('图片路径数组参数(imagePaths)是必需的，且不能为空');
       }
 
-      if (!secretId || !secretKey) {
-        throw new Error('腾讯云认证信息缺失，请提供 secretId 和 secretKey 参数');
+      // 优先使用环境变量，其次使用参数中的密钥，最后使用构造函数中的密钥
+      const finalSecretId = process.env.TENCENT_SECRET_ID || secretId || this.secretId;
+      const finalSecretKey = process.env.TENCENT_SECRET_KEY || secretKey || this.secretKey;
+      const finalRegion = process.env.TENCENT_REGION || region || this.region;
+
+      if (!finalSecretId || !finalSecretKey) {
+        throw new Error(`腾讯云认证信息缺失。请通过以下方式之一提供：
+1. 环境变量：TENCENT_SECRET_ID 和 TENCENT_SECRET_KEY
+2. 启动参数：--secret-id 和 --secret-key
+3. 调用参数：secretId 和 secretKey`);
       }
 
       // 检查所有图片文件是否存在
@@ -399,12 +410,12 @@ class VideoMCPServer {
       }
 
       console.error(`开始批量分析图片，共 ${imagePaths.length} 张图片`);
-      console.error(`分析地域: ${region || 'ap-beijing'}`);
+      console.error(`分析地域: ${finalRegion}`);
 
       const hunyuanClient = new HunyuanClient({
-        secretId,
-        secretKey,
-        region,
+        secretId: finalSecretId,
+        secretKey: finalSecretKey,
+        region: finalRegion,
       });
 
       const results = await hunyuanClient.analyzeImageBatch(imagePaths, prompt);
@@ -509,7 +520,56 @@ class VideoMCPServer {
 }
 
 async function main() {
-  const server = new VideoMCPServer();
+  // 解析命令行参数
+  const args = process.argv.slice(2);
+  const options: { secretId?: string; secretKey?: string; region?: string } = {};
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const nextArg = args[i + 1];
+    
+    switch (arg) {
+      case '--secret-id':
+        if (nextArg && !nextArg.startsWith('--')) {
+          options.secretId = nextArg;
+          i++; // 跳过下一个参数，因为它是值
+        }
+        break;
+      case '--secret-key':
+        if (nextArg && !nextArg.startsWith('--')) {
+          options.secretKey = nextArg;
+          i++; // 跳过下一个参数，因为它是值
+        }
+        break;
+      case '--region':
+        if (nextArg && !nextArg.startsWith('--')) {
+          options.region = nextArg;
+          i++; // 跳过下一个参数，因为它是值
+        }
+        break;
+      case '--help':
+      case '-h':
+        console.error(`
+Video MCP Server - 视频处理和分析服务
+
+用法:
+  npx @pickstar-2002/video-mcp@latest [选项]
+
+选项:
+  --secret-id <id>     腾讯云 SecretId
+  --secret-key <key>   腾讯云 SecretKey  
+  --region <region>    腾讯云地域 (默认: ap-beijing)
+  --help, -h           显示帮助信息
+
+示例:
+  npx @pickstar-2002/video-mcp@latest --secret-id=your-id --secret-key=your-key --region=ap-beijing
+        `);
+        process.exit(0);
+        break;
+    }
+  }
+  
+  const server = new VideoMCPServer(options);
   await server.run();
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "@pickstar-2002/video-mcp",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Video processing MCP server with Tencent Cloud AI integration",
   "main": "dist/index.js",
   "type": "module",

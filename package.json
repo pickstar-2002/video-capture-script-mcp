@@ -1,6 +1,6 @@
 {
-  "name": "video-mcp",
-  "version": "1.0.0",
+  "name": "@pickstar-2002/video-mcp",
+  "version": "1.0.7",
   "description": "Video processing MCP server with Tencent Cloud AI integration",
   "main": "dist/index.js",
   "type": "module",
@@ -18,7 +18,13 @@
     "setup": "node start.js",
     "clean": "rm -rf dist temp_frames temp_test_frames"
   },
-  "keywords": ["mcp", "video", "processing", "tencent", "ai"],
+  "keywords": [
+    "mcp",
+    "video",
+    "processing",
+    "tencent",
+    "ai"
+  ],
   "author": "pickstar-2002",
   "license": "MIT",
   "dependencies": {
@@ -38,6 +44,6 @@
     "prettier": "^3.0.0"
   },
   "bin": {
-    "video-mcp": "./dist/index.js"
+    "video-mcp": "dist/index.js"
   }
 }

@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -512,7 +514,8 @@ async function main() {
 }
 
 // 如果直接运行此文件，启动服务器
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/')) || 
+    process.argv[1].includes('index.js')) {
   main().catch((error) => {
     console.error('Server failed to start:', error);
     process.exit(1);

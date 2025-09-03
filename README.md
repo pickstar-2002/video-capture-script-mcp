@@ -1,6 +1,6 @@
 # 🎥 Video MCP Server
 
-[![npm version](https://img.shields.io/npm/v/video-mcp.svg)](https://www.npmjs.com/package/video-mcp)
+[![npm version](https://img.shields.io/npm/v/@pickstar-2002/video-mcp.svg)](https://www.npmjs.com/package/@pickstar-2002/video-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
@@ -47,7 +47,7 @@
   "mcpServers": {
     "video-mcp": {
       "command": "npx",
-      "args": ["video-mcp@latest"]
+      "args": ["@pickstar-2002/video-mcp@latest"]
     }
   }
 }
@@ -93,7 +93,7 @@ TENCENT_REGION=ap-beijing
   "mcpServers": {
     "video-mcp": {
       "command": "npx",
-      "args": ["video-mcp@latest"],
+      "args": ["@pickstar-2002/video-mcp@latest"],
       "env": {
         "TENCENT_SECRET_ID": "your_secret_id",
         "TENCENT_SECRET_KEY": "your_secret_key"

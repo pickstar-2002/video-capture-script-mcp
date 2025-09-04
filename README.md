@@ -35,7 +35,7 @@
 ```json
 {
   "mcpServers": {
-    "video-mcp": {
+    "video-capture-script-mcp": {
       "command": "npx",
       "args": ["@pickstar-2002/video-mcp@latest"],
       "env": {
@@ -78,7 +78,7 @@ npm test
 ```json
 {
   "mcpServers": {
-    "video-mcp": {
+    "video-capture-script-mcp": {
       "command": "npx",
       "args": ["@pickstar-2002/video-mcp@latest"]
     }
@@ -227,7 +227,7 @@ sudo yum install ffmpeg
 ### 项目结构
 
 ```
-video-mcp/
+video-capture-script-mcp/
 ├── src/
 │   ├── index.ts              # MCP 服务入口
 │   ├── video-analyzer.ts     # 视频分析核心逻辑

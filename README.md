@@ -1,15 +1,15 @@
-# 🎬 Video MCP
+# 🎬 热门视频拍摄脚本MCP
 
 [![npm version](https://img.shields.io/npm/v/@pickstar-2002/video-mcp.svg)](https://www.npmjs.com/package/@pickstar-2002/video-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-> 🚀 基于 Model Context Protocol (MCP) 的智能视频分析工具，支持视频帧提取和AI内容分析
+> 🚀 基于 Model Context Protocol (MCP) 的智能视频处理工具，专注于热门视频分析和AI驱动的专业拍摄脚本生成
 
 ## ✨ 简介
 
-Video MCP 是一个强大的视频分析工具，通过 MCP 协议为 AI 助手提供视频处理能力。它可以从视频中提取关键帧，并使用腾讯混元多模态 API 进行智能内容分析，帮助用户快速理解视频内容。
+热门视频拍摄脚本MCP 是一个专业的视频分析和脚本生成工具，通过 MCP 协议为 AI 助手提供强大的视频处理能力。它可以从热门视频中提取关键帧，使用腾讯混元多模态 API 进行智能内容分析，并生成专业的拍摄脚本，帮助创作者快速理解视频内容并制作类似的热门内容。
 
 ## 🎯 主要功能
 
@@ -18,6 +18,10 @@ Video MCP 是一个强大的视频分析工具，通过 MCP 协议为 AI 助手�
   - 关键帧提取 (keyframe) 
   - 场景变化检测 (scene_change)
 - 🤖 **AI 内容分析**: 集成腾讯混元多模态 API，智能分析视频内容
+- 🎬 **拍摄脚本生成**: 基于视频分析结果，AI生成专业拍摄脚本
+  - 支持多种脚本类型：商业广告、纪录片、教学视频、叙事视频
+  - 自定义目标受众、拍摄风格、时长要求
+  - 专业分镜脚本格式，包含镜头描述、拍摄要点
 - 📊 **批量处理**: 支持批量分析多张图片
 - 📹 **视频信息获取**: 获取视频文件的详细元数据信息
 - 🔧 **灵活配置**: 可自定义提取帧数、输出目录等参数
@@ -48,8 +52,8 @@ Video MCP 是一个强大的视频分析工具，通过 MCP 协议为 AI 助手�
 
 ```bash
 # 克隆仓库
-git clone https://github.com/pickstar-2002/video-mcp.git
-cd video-mcp
+git clone https://github.com/pickstar-2002/video-capture-script-mcp.git
+cd video-capture-script-mcp
 
 # 安装依赖
 npm install
@@ -143,6 +147,30 @@ npx @pickstar-2002/video-mcp@latest
   "videoPath": "path/to/video.mp4"
 }
 ```
+
+#### 🎬 generate_video_script
+基于视频内容生成专业拍摄脚本
+
+```typescript
+// 参数示例
+{
+  "videoPath": "path/to/video.mp4",
+  "scriptType": "commercial",
+  "targetDuration": 60,
+  "targetAudience": "年轻消费者",
+  "style": "时尚、动感",
+  "prompt": "重点突出产品的创新特性",
+  "secretId": "your-secret-id",
+  "secretKey": "your-secret-key"
+}
+```
+
+**脚本类型说明：**
+- `commercial`: 商业广告脚本 - 突出产品卖点，包含行动号召
+- `documentary`: 纪录片脚本 - 注重真实性和深度分析
+- `tutorial`: 教学视频脚本 - 步骤清晰，易于跟随
+- `narrative`: 叙事视频脚本 - 强调故事性和情感表达
+- `custom`: 自定义脚本 - 根据prompt自由定制
 
 ## 🛠️ 技术栈
 
@@ -252,7 +280,7 @@ npm run format
 
 ## 🐛 问题反馈
 
-如果您遇到任何问题或有功能建议，请在 [GitHub Issues](https://github.com/pickstar-2002/video-mcp/issues) 中提出。
+如果您遇到任何问题或有功能建议，请在 [GitHub Issues](https://github.com/pickstar-2002/video-capture-script-mcp/issues) 中提出。
 
 ## 📞 联系方式
 

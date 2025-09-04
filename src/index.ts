@@ -12,7 +12,7 @@ import { createReadStream, createWriteStream, mkdirSync, existsSync } from 'fs';
 import { unlink, readFile } from 'fs/promises';
 import path from 'path';
 import { HunyuanClient } from './hunyuan-client.js';
-import { VideoProcessor } from './video-processor.js';
+import { VideoProcessor, VideoScriptOptions } from './video-processor.js';
 import { FrameExtractor } from './frame-extractor.js';
 
 class VideoMCPServer {
@@ -170,6 +170,68 @@ class VideoMCPServer {
               required: ['videoPath'],
             },
           },
+          {
+            name: 'generate_video_script',
+            description: '基于视频内容生成专业拍摄脚本',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                videoPath: {
+                  type: 'string',
+                  description: '视频文件路径',
+                },
+                prompt: {
+                  type: 'string',
+                  description: '自定义脚本生成要求（可选）',
+                },
+                maxFrames: {
+                  type: 'number',
+                  description: '最大分析帧数（默认5帧以控制成本）',
+                  default: 5,
+                },
+                strategy: {
+                  type: 'string',
+                  enum: ['uniform', 'keyframe', 'scene_change'],
+                  description: '帧提取策略',
+                  default: 'keyframe',
+                },
+                scriptType: {
+                  type: 'string',
+                  enum: ['commercial', 'documentary', 'tutorial', 'narrative', 'custom'],
+                  description: '脚本类型：commercial(商业广告), documentary(纪录片), tutorial(教学), narrative(叙事), custom(自定义)',
+                  default: 'commercial',
+                },
+                targetDuration: {
+                  type: 'number',
+                  description: '目标脚本时长（秒）',
+                },
+                targetAudience: {
+                  type: 'string',
+                  description: '目标受众（默认：一般观众）',
+                  default: '一般观众',
+                },
+                style: {
+                  type: 'string',
+                  description: '拍摄风格（默认：专业、吸引人）',
+                  default: '专业、吸引人',
+                },
+                secretId: {
+                  type: 'string',
+                  description: '腾讯云 SecretId（可选，优先使用环境变量 TENCENT_SECRET_ID）',
+                },
+                secretKey: {
+                  type: 'string',
+                  description: '腾讯云 SecretKey（可选，优先使用环境变量 TENCENT_SECRET_KEY）',
+                },
+                region: {
+                  type: 'string',
+                  description: '腾讯云地域（可选，默认 ap-beijing）',
+                  default: 'ap-beijing',
+                },
+              },
+              required: ['videoPath'],
+            },
+          },
         ] as Tool[],
       };
     });
@@ -188,8 +250,10 @@ class VideoMCPServer {
             return await this.handleAnalyzeImageBatch(args);
           case 'get_video_info':
             return await this.handleGetVideoInfo(args);
+          case 'generate_video_script':
+            return await this.handleGenerateVideoScript(args);
           default:
-            throw new Error(`未知的工具: ${name}。支持的工具包括: extract_video_frames, analyze_video_content, analyze_image_batch, get_video_info`);
+            throw new Error(`未知的工具: ${name}。支持的工具包括: extract_video_frames, analyze_video_content, analyze_image_batch, get_video_info, generate_video_script`);
         }
       } catch (error) {
         const errorMessage = this.formatError(error, name, args);
@@ -508,6 +572,98 @@ class VideoMCPServer {
       };
     } catch (error) {
       console.error(`获取视频信息失败:`, error);
+      throw error;
+    }
+  }
+
+  private async handleGenerateVideoScript(args: any) {
+    const { 
+      videoPath, 
+      prompt, 
+      maxFrames = 5, 
+      strategy = 'keyframe', 
+      scriptType = 'commercial',
+      targetDuration,
+      targetAudience = '一般观众',
+      style = '专业、吸引人',
+      secretId, 
+      secretKey, 
+      region 
+    } = args;
+
+    try {
+      // 参数验证
+      if (!videoPath) {
+        throw new Error('视频路径参数(videoPath)是必需的');
+      }
+
+      // 优先使用环境变量，其次使用参数中的密钥，最后使用构造函数中的密钥
+      const finalSecretId = process.env.TENCENT_SECRET_ID || secretId || this.secretId;
+      const finalSecretKey = process.env.TENCENT_SECRET_KEY || secretKey || this.secretKey;
+      const finalRegion = process.env.TENCENT_REGION || region || this.region;
+
+      if (!finalSecretId || !finalSecretKey) {
+        throw new Error(`腾讯云认证信息缺失。请通过以下方式之一提供：
+1. 环境变量：TENCENT_SECRET_ID 和 TENCENT_SECRET_KEY
+2. 启动参数：--secret-id 和 --secret-key
+3. 调用参数：secretId 和 secretKey`);
+      }
+
+      // 检查文件是否存在
+      const fs = await import('fs/promises');
+      try {
+        await fs.access(videoPath);
+      } catch {
+        throw new Error(`视频文件不存在或无法访问: ${videoPath}`);
+      }
+
+      console.error(`开始生成视频拍摄脚本: ${videoPath}`);
+      console.error(`脚本参数 - 类型: ${scriptType}, 最大帧数: ${maxFrames}, 策略: ${strategy}, 目标受众: ${targetAudience}`);
+
+      const scriptOptions: VideoScriptOptions = {
+        prompt,
+        maxFrames,
+        strategy,
+        scriptType,
+        targetDuration,
+        targetAudience,
+        style,
+        secretId: finalSecretId,
+        secretKey: finalSecretKey,
+        region: finalRegion,
+      };
+
+      const result = await this.videoProcessor.generateVideoScript(videoPath, scriptOptions);
+
+      console.error(`视频脚本生成完成 - 总Token使用: ${result.usage.totalTokens} (分析: ${result.usage.analysisTokens}, 脚本: ${result.usage.scriptTokens})`);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ 视频拍摄脚本生成完成: ${videoPath}`,
+          },
+          {
+            type: 'text',
+            text: `📊 Token使用统计:
+- 视频分析: ${result.usage.analysisTokens} tokens
+- 脚本生成: ${result.usage.scriptTokens} tokens  
+- 总计: ${result.usage.totalTokens} tokens`,
+          },
+          {
+            type: 'text',
+            text: `🎬 专业拍摄脚本:
+${result.script}`,
+          },
+          {
+            type: 'text',
+            text: `📝 原始视频分析:
+${result.videoAnalysis}`,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error(`视频脚本生成失败:`, error);
       throw error;
     }
   }

@@ -17,6 +17,15 @@ export interface ImageAnalysisResult {
   };
 }
 
+export interface TextGenerationResult {
+  content: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 export interface Message {
   Role: string;
   Contents?: Array<{
@@ -395,6 +404,124 @@ export class HunyuanClient {
       };
     } catch (error) {
       console.error('Error analyzing images in single request:', error);
+      throw error;
+    }
+  }
+
+  async generateText(prompt: string, model: string = 'hunyuan-lite'): Promise<TextGenerationResult> {
+    try {
+      console.error(`开始生成文本内容，使用模型: ${model}`);
+      this.validateCredentials();
+      
+      const params = {
+        Model: model,
+        Messages: [
+          {
+            Role: 'user',
+            Content: prompt,
+          },
+        ],
+        Stream: false,
+      };
+
+      const timestamp = Math.floor(Date.now() / 1000);
+      const authorization = this.generateAuthorization(params, timestamp);
+
+      console.error(`发送文本生成请求到腾讯云混元服务 (地域: ${this.region})`);
+
+      const response = await fetch(`https://${this.endpoint}/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authorization,
+          'Content-Type': 'application/json; charset=utf-8',
+          'Host': this.endpoint,
+          'X-TC-Action': 'ChatCompletions',
+          'X-TC-Timestamp': timestamp.toString(),
+          'X-TC-Version': '2023-09-01',
+          'X-TC-Region': this.region,
+        },
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`腾讯云API请求失败 (HTTP ${response.status} ${response.statusText}):
+${errorText}
+
+请检查:
+1. 网络连接是否正常
+2. API端点是否正确 (${this.endpoint})
+3. 服务地域设置 (${this.region})`);
+      }
+
+      const result = await response.json() as any;
+      
+      if (result.Response?.Error) {
+        const errorCode = result.Response.Error.Code;
+        const errorMessage = result.Response.Error.Message;
+        const requestId = result.Response.RequestId;
+        
+        // 提供更友好的错误信息
+        let detailedError = `腾讯云混元API错误:
+- 错误代码: ${errorCode}
+- 错误信息: ${errorMessage}
+- 请求ID: ${requestId}
+
+`;
+        
+        if (errorCode === 'FailedOperation.ServiceNotActivated') {
+          detailedError += `解决方案:
+1. 访问腾讯云控制台开通混元大模型服务
+2. 开通地址: https://console.cloud.tencent.com/hunyuan
+3. 确保账户余额充足
+4. 检查服务地域设置 (当前: ${this.region})`;
+        } else if (errorCode === 'AuthFailure.SignatureFailure') {
+          detailedError += `解决方案:
+1. 检查SecretId是否正确: ***${this.secretId?.slice(-4)}
+2. 检查SecretKey是否正确且未过期
+3. 确认API密钥权限是否包含混元服务
+4. 检查系统时间是否准确`;
+        } else if (errorCode === 'LimitExceeded.QPSLimitExceeded' || errorCode === 'LimitExceeded') {
+          detailedError += `解决方案:
+1. 当前调用频率过高，请稍后重试
+2. 考虑增加请求间隔时间
+3. 升级API调用限制配额
+4. 实施请求队列机制`;
+        } else if (errorCode === 'InvalidParameter') {
+          detailedError += `解决方案:
+1. 检查输入参数格式是否正确
+2. 确认提示词长度是否合适
+3. 验证模型名称是否正确
+4. 检查请求格式是否符合API规范`;
+        } else {
+          detailedError += `解决方案:
+1. 记录请求ID: ${requestId}
+2. 联系腾讯云技术支持
+3. 提供详细的错误信息和使用场景`;
+        }
+        
+        throw new Error(detailedError);
+      }
+
+      const choice = result.Response?.Choices?.[0];
+      if (!choice) {
+        throw new Error('腾讯云混元API响应异常：未返回有效的生成结果。请稍后重试或联系技术支持。');
+      }
+
+      const textResult = {
+        content: choice.Message.Content,
+        usage: {
+          promptTokens: result.Response.Usage.PromptTokens,
+          completionTokens: result.Response.Usage.CompletionTokens,
+          totalTokens: result.Response.Usage.TotalTokens,
+        },
+      };
+
+      console.error(`文本生成完成 - Token使用: ${textResult.usage.totalTokens} (提示: ${textResult.usage.promptTokens}, 回复: ${textResult.usage.completionTokens})`);
+
+      return textResult;
+    } catch (error) {
+      console.error(`文本生成失败:`, error);
       throw error;
     }
   }

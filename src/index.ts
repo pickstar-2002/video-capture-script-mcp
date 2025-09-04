@@ -232,6 +232,58 @@ class VideoMCPServer {
               required: ['videoPath'],
             },
           },
+          {
+            name: 'generate_image_script',
+            description: '基于批量图片内容生成专业拍摄脚本',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                imagePaths: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: '图片文件路径数组',
+                },
+                prompt: {
+                  type: 'string',
+                  description: '自定义脚本生成要求（可选）',
+                },
+                scriptType: {
+                  type: 'string',
+                  enum: ['commercial', 'documentary', 'tutorial', 'narrative', 'custom'],
+                  description: '脚本类型：commercial(商业广告), documentary(纪录片), tutorial(教学), narrative(叙事), custom(自定义)',
+                  default: 'commercial',
+                },
+                targetDuration: {
+                  type: 'number',
+                  description: '目标脚本时长（秒）',
+                },
+                targetAudience: {
+                  type: 'string',
+                  description: '目标受众（默认：一般观众）',
+                  default: '一般观众',
+                },
+                style: {
+                  type: 'string',
+                  description: '拍摄风格（默认：专业、吸引人）',
+                  default: '专业、吸引人',
+                },
+                secretId: {
+                  type: 'string',
+                  description: '腾讯云 SecretId（可选，优先使用环境变量 TENCENT_SECRET_ID）',
+                },
+                secretKey: {
+                  type: 'string',
+                  description: '腾讯云 SecretKey（可选，优先使用环境变量 TENCENT_SECRET_KEY）',
+                },
+                region: {
+                  type: 'string',
+                  description: '腾讯云地域（可选，默认 ap-beijing）',
+                  default: 'ap-beijing',
+                },
+              },
+              required: ['imagePaths'],
+            },
+          },
         ] as Tool[],
       };
     });
@@ -252,8 +304,10 @@ class VideoMCPServer {
             return await this.handleGetVideoInfo(args);
           case 'generate_video_script':
             return await this.handleGenerateVideoScript(args);
+          case 'generate_image_script':
+            return await this.handleGenerateImageScript(args);
           default:
-            throw new Error(`未知的工具: ${name}。支持的工具包括: extract_video_frames, analyze_video_content, analyze_image_batch, get_video_info, generate_video_script`);
+            throw new Error(`未知的工具: ${name}。支持的工具包括: extract_video_frames, analyze_video_content, analyze_image_batch, get_video_info, generate_video_script, generate_image_script`);
         }
       } catch (error) {
         const errorMessage = this.formatError(error, name, args);
@@ -664,6 +718,109 @@ ${result.videoAnalysis}`,
       };
     } catch (error) {
       console.error(`视频脚本生成失败:`, error);
+      throw error;
+    }
+  }
+
+  private async handleGenerateImageScript(args: any) {
+    const { 
+      imagePaths, 
+      prompt, 
+      scriptType = 'commercial',
+      targetDuration,
+      targetAudience = '一般观众',
+      style = '专业、吸引人',
+      secretId, 
+      secretKey, 
+      region 
+    } = args;
+
+    try {
+      // 参数验证
+      if (!imagePaths || !Array.isArray(imagePaths) || imagePaths.length === 0) {
+        throw new Error('图片路径数组参数(imagePaths)是必需的，且不能为空');
+      }
+
+      // 优先使用环境变量，其次使用参数中的密钥，最后使用构造函数中的密钥
+      const finalSecretId = process.env.TENCENT_SECRET_ID || secretId || this.secretId;
+      const finalSecretKey = process.env.TENCENT_SECRET_KEY || secretKey || this.secretKey;
+      const finalRegion = process.env.TENCENT_REGION || region || this.region;
+
+      if (!finalSecretId || !finalSecretKey) {
+        throw new Error('腾讯云认证信息缺失。请通过以下方式之一提供：\
+1. 环境变量：TENCENT_SECRET_ID 和 TENCENT_SECRET_KEY\
+2. 启动参数：--secret-id 和 --secret-key\
+3. 调用参数：secretId 和 secretKey');
+      }
+
+      // 检查所有图片文件是否存在
+      const fs = await import('fs/promises');
+      const invalidPaths: string[] = [];
+      
+      for (const imagePath of imagePaths) {
+        try {
+          await fs.access(imagePath);
+        } catch {
+          invalidPaths.push(imagePath);
+        }
+      }
+
+      if (invalidPaths.length > 0) {
+        throw new Error('以下图片文件不存在或无法访问：\
+' + invalidPaths.join('\
+'));
+      }
+
+      console.error('开始基于 ' + imagePaths.length + ' 张图片生成拍摄脚本');
+      console.error('脚本参数 - 类型: ' + scriptType + ', 目标受众: ' + targetAudience + ', 风格: ' + style);
+
+      const result = await this.videoProcessor.generateImageScript(imagePaths, {
+        prompt,
+        scriptType,
+        targetDuration,
+        targetAudience,
+        style,
+        secretId: finalSecretId,
+        secretKey: finalSecretKey,
+        region: finalRegion,
+      });
+
+      console.error('图片脚本生成完成 - 总Token使用: ' + result.usage.totalTokens + ' (分析: ' + result.usage.analysisTokens + ', 脚本: ' + result.usage.scriptTokens + ')');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '✅ 基于图片的拍摄脚本生成完成',
+          },
+          {
+            type: 'text',
+            text: '📊 处理统计：\
+- 图片数量: ' + imagePaths.length + '\
+- 脚本类型: ' + scriptType + '\
+- 目标受众: ' + targetAudience,
+          },
+          {
+            type: 'text',
+            text: '📊 Token使用统计:\
+- 图片分析: ' + result.usage.analysisTokens + ' tokens\
+- 脚本生成: ' + result.usage.scriptTokens + ' tokens\
+- 总计: ' + result.usage.totalTokens + ' tokens',
+          },
+          {
+            type: 'text',
+            text: '🎬 专业拍摄脚本:\
+' + result.script,
+          },
+          {
+            type: 'text',
+            text: '📝 原始图片分析:\
+' + result.imageAnalysis,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error('图片脚本生成失败:', error);
       throw error;
     }
   }
